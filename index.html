@@ -1,785 +1,1059 @@
 <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link type="text/css" rel="stylesheet" href="style.css"/>
+  </head>
+  <body>
+    <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TrackFlow Pro · Optimizado</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- MapLibre GL JS & CSS -->
-    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
-    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
-    <!-- Turf.js para simplificar geometrías -->
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-    <style>
-        body { font-family: 'Inter', system-ui, sans-serif; }
-        .scrollable-thin { scrollbar-width: thin; }
-        
-        /* Loading overlay optimizado */
-        .driver-loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(4px);
-            display: none;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            transition: opacity 0.2s ease;
-            pointer-events: none;
-        }
-        .driver-loading-overlay.active {
-            display: flex;
-        }
-        .driver-loading-spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid #e2e8f0;
-            border-top-color: #3b82f6;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-bottom: 12px;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
-        /* Loading inicial */
-        .map-loading-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
-            transition: opacity 0.3s;
-            pointer-events: none;
-        }
-        .map-loading-overlay.hidden {
-            opacity: 0;
-            pointer-events: none;
-        }
-        
-        /* Estados de entrega */
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-        .status-done {
-            background: #d1fae5;
-            color: #065f46;
-        }
-        .status-transit {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-        .status-pending {
-            background: #f1f5f9;
-            color: #334155;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Letreros Mili – Letreros Para Carros</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --yellow: #FFD000;
+    --yellow-light: #FFE55C;
+    --yellow-dark: #E6BB00;
+    --black: #0A0A0A;
+    --dark: #111111;
+    --card-bg: #1A1A1A;
+    --border: #2A2A2A;
+    --text: #F0F0F0;
+    --text-muted: #888;
+    --wa-green: #25D366;
+    --radius: 14px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--black);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── TICKER ── */
+  .ticker-wrap {
+    background: var(--yellow);
+    overflow: hidden;
+    white-space: nowrap;
+    height: 38px;
+    display: flex;
+    align-items: center;
+  }
+  .ticker-inner {
+    display: inline-flex;
+    animation: ticker 22s linear infinite;
+  }
+  .ticker-item {
+    color: var(--black);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 0 32px;
+  }
+  .ticker-sep { color: var(--black); opacity: 0.4; padding: 0 8px; }
+  @keyframes ticker { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ── HERO / CAROUSEL ── */
+  .carousel-section {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+    background: var(--dark);
+  }
+  .carousel-track {
+    display: flex;
+    transition: transform 0.6s cubic-bezier(.77,0,.18,1);
+  }
+  .carousel-slide {
+    min-width: 100%;
+    height: 420px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .carousel-slide img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center;
+  }
+  .carousel-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,0,0,.55) 0%, transparent 60%);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 40px 48px;
+  }
+  .carousel-overlay .promo-badge {
+    background: var(--yellow);
+    color: var(--black);
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 13px;
+    letter-spacing: 2px;
+    padding: 4px 14px;
+    border-radius: 4px;
+    width: fit-content;
+    margin-bottom: 10px;
+  }
+  .carousel-overlay h2 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(32px, 5vw, 64px);
+    letter-spacing: 1px;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 2px 20px rgba(0,0,0,.4);
+  }
+  .carousel-overlay p {
+    font-size: 15px;
+    color: rgba(255,255,255,.8);
+    margin-top: 8px;
+    font-weight: 300;
+  }
+  .carousel-placeholder {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+  .carousel-placeholder .ph-icon { font-size: 48px; opacity: 0.3; }
+  .carousel-placeholder p { font-size: 14px; color: var(--text-muted); text-align: center; max-width: 260px; }
+
+  .carousel-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(0,0,0,.55);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #fff;
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    font-size: 20px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s;
+    z-index: 10;
+  }
+  .carousel-btn:hover { background: var(--yellow); color: var(--black); }
+  .carousel-btn.prev { left: 16px; }
+  .carousel-btn.next { right: 16px; }
+
+  .carousel-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 0 0;
+    background: var(--dark);
+    padding-bottom: 4px;
+  }
+  .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    cursor: pointer;
+    transition: all .3s;
+  }
+  .dot.active { background: var(--yellow); width: 24px; border-radius: 4px; }
+
+  /* ── BRAND BAR ── */
+  .brand-bar {
+    background: var(--dark);
+    padding: 28px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  .brand-logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .logo-mark {
+    width: 52px; height: 52px;
+    background: var(--yellow);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    color: var(--black);
+    letter-spacing: 1px;
+    flex-shrink: 0;
+  }
+  .logo-text h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 2px;
+    color: var(--yellow);
+    line-height: 1;
+  }
+  .logo-text p {
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-family: 'Space Mono', monospace;
+  }
+
+  /* ── SEARCH ── */
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 420px;
+  }
+  .search-input {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1.5px solid var(--border);
+    border-radius: 50px;
+    padding: 12px 20px 12px 48px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+  }
+  .search-input:focus {
+    border-color: var(--yellow);
+    box-shadow: 0 0 0 3px rgba(255,208,0,.12);
+  }
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-size: 16px;
+  }
+  .search-results-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    align-self: center;
+  }
+  .search-results-badge span { color: var(--yellow); font-weight: 700; }
+
+  /* ── MAIN ── */
+  main {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .section-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    letter-spacing: 2px;
+    color: var(--yellow);
+  }
+  .section-subtitle {
+    font-size: 14px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  /* ── GRID ── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 20px;
+  }
+
+  /* ── CARD ── */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform .25s, box-shadow .25s, border-color .25s;
+    animation: fadeUp .4s ease both;
+  }
+  .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0,0,0,.5);
+    border-color: var(--yellow);
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .card-img-wrap {
+    width: 100%;
+    aspect-ratio: 4/3;
+    overflow: hidden;
+    background: #222;
+    position: relative;
+  }
+  .card-img-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform .4s ease;
+  }
+  .card:hover .card-img-wrap img { transform: scale(1.06); }
+  .card-badge {
+    position: absolute;
+    top: 10px; left: 10px;
+    background: var(--yellow);
+    color: var(--black);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+  }
+  .card-body { padding: 16px; }
+  .card-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 20px;
+    letter-spacing: 1px;
+    color: var(--text);
+    margin-bottom: 6px;
+    line-height: 1.1;
+  }
+  .card-meta {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .meta-pill {
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(255,255,255,.05);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-family: 'Space Mono', monospace;
+  }
+  .card-price {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 26px;
+    color: var(--yellow);
+    letter-spacing: 1px;
+  }
+  .card-price span {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0;
+    margin-left: 4px;
+  }
+  .card-cta {
+    margin-top: 12px;
+    width: 100%;
+    padding: 10px;
+    background: rgba(255,208,0,.08);
+    border: 1px solid rgba(255,208,0,.25);
+    border-radius: 8px;
+    color: var(--yellow);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .2s;
+    letter-spacing: .5px;
+  }
+  .card-cta:hover { background: rgba(255,208,0,.18); }
+
+  /* ── PAGINATION ── */
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 48px;
+    flex-wrap: wrap;
+  }
+  .page-btn {
+    width: 40px; height: 40px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all .2s;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .page-btn:hover { border-color: var(--yellow); color: var(--yellow); }
+  .page-btn.active { background: var(--yellow); color: var(--black); border-color: var(--yellow); font-weight: 700; }
+  .page-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+  /* ── MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.85);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+
+  .modal {
+    background: var(--dark);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    max-width: 860px;
+    width: 100%;
+    max-height: 92vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalIn .3s cubic-bezier(.34,1.56,.64,1) both;
+  }
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(.92); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  .modal-close {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    justify-content: flex-end;
+    padding: 16px 16px 0;
+    background: linear-gradient(to bottom, var(--dark) 80%, transparent);
+  }
+  .modal-close-btn {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.08);
+    border: none;
+    color: var(--text);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .2s;
+  }
+  .modal-close-btn:hover { background: rgba(255,255,255,.18); }
+
+  .modal-inner {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    padding: 0 32px 32px;
+  }
+  @media (max-width: 680px) {
+    .modal-inner { grid-template-columns: 1fr; }
+  }
+
+  /* Zoom image */
+  .modal-img-zone {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #222;
+    aspect-ratio: 1;
+    cursor: zoom-in;
+  }
+  .modal-img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform .35s ease;
+    transform-origin: center;
+    display: block;
+  }
+  .modal-img-zone.zoomed { cursor: zoom-out; }
+  .modal-img-zone.zoomed .modal-img { transform: scale(2); }
+  .zoom-hint {
+    position: absolute;
+    bottom: 10px; right: 10px;
+    background: rgba(0,0,0,.6);
+    color: rgba(255,255,255,.75);
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    pointer-events: none;
+    font-family: 'Space Mono', monospace;
+  }
+
+  .modal-info {
+    padding: 8px 0 0 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  @media (max-width: 680px) {
+    .modal-info { padding: 20px 0 0; }
+  }
+
+  .modal-tag {
+    display: inline-block;
+    background: rgba(255,208,0,.15);
+    border: 1px solid rgba(255,208,0,.3);
+    color: var(--yellow);
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 4px;
+    width: fit-content;
+  }
+  .modal-name {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 38px;
+    letter-spacing: 2px;
+    line-height: 1;
+    color: var(--text);
+  }
+  .modal-price {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 42px;
+    color: var(--yellow);
+    letter-spacing: 1px;
+  }
+  .modal-price small {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0;
+    margin-left: 6px;
+  }
+
+  .modal-specs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .spec-item {
+    background: rgba(255,255,255,.04);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+  }
+  .spec-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 4px;
+  }
+  .spec-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .modal-desc {
+    font-size: 13.5px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+
+  .wa-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: var(--wa-green);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    padding: 15px 24px;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    transition: filter .2s, transform .15s;
+    margin-top: 4px;
+  }
+  .wa-btn:hover { filter: brightness(1.1); transform: translateY(-2px); }
+  .wa-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state .es-icon { font-size: 56px; margin-bottom: 16px; }
+  .empty-state h3 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 24px;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+  .empty-state p { font-size: 14px; margin-top: 8px; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--border);
+    background: var(--dark);
+    padding: 28px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+  footer p { font-size: 12px; color: var(--text-muted); font-family: 'Space Mono', monospace; }
+  footer span { color: var(--yellow); }
+
+  /* ── WA FLOAT ── */
+  .wa-float {
+    position: fixed;
+    bottom: 28px;
+    right: 28px;
+    width: 58px; height: 58px;
+    background: var(--wa-green);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 24px rgba(37,211,102,.45);
+    cursor: pointer;
+    z-index: 900;
+    text-decoration: none;
+    transition: transform .2s, box-shadow .2s;
+    animation: pulse 2.5s infinite;
+  }
+  .wa-float:hover { transform: scale(1.1); box-shadow: 0 10px 32px rgba(37,211,102,.6); }
+  .wa-float svg { width: 30px; height: 30px; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 6px 24px rgba(37,211,102,.45); }
+    50% { box-shadow: 0 6px 36px rgba(37,211,102,.7); }
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--black); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 700px) {
+    .brand-bar { padding: 20px 20px; }
+    .carousel-overlay { padding: 24px; }
+    main { padding: 24px 16px 60px; }
+  }
+</style>
 </head>
-<body class="h-screen flex flex-col bg-slate-100 text-slate-800 text-xs md:text-sm overflow-hidden">
+<body>
 
-<!-- Loading overlay inicial -->
-<div class="map-loading-overlay" id="mapLoading">
-    <div class="driver-loading-spinner" style="border-top-color: white;"></div>
-    <div class="text-white font-medium">Cargando mapa...</div>
+<!-- TICKER -->
+<div class="ticker-wrap">
+  <div class="ticker-inner" id="ticker">
+    <span class="ticker-item">🔥 Letreros Para Carros de Alta Calidad</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Envíos a Todo el Perú</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Pide por WhatsApp Ahora</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Materiales Resistentes al Sol y Agua</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">📦 Stock Disponible</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Letreros Mili – Tu Marca, Siempre Presente</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">🔥 Letreros Para Carros de Alta Calidad</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Envíos a Todo el Perú</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Pide por WhatsApp Ahora</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Materiales Resistentes al Sol y Agua</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">📦 Stock Disponible</span>
+    <span class="ticker-sep">◆</span>
+    <span class="ticker-item">Letreros Mili – Tu Marca, Siempre Presente</span>
+    <span class="ticker-sep">◆</span>
+  </div>
 </div>
 
-<!-- Loading para cambios de conductor -->
-<div class="driver-loading-overlay" id="driverLoading">
-    <div class="driver-loading-spinner"></div>
-    <div class="font-medium">Actualizando información...</div>
+<!-- CAROUSEL PROMO -->
+<div class="carousel-section">
+  <div class="carousel-track" id="carouselTrack">
+    <!-- Slide 1: placeholder -->
+    <div class="carousel-slide">
+      <div class="carousel-placeholder">
+        <div class="ph-icon">🖼️</div>
+        <p>Reemplaza esta imagen con tu promo — edita <code>promoSlides</code> en el JS</p>
+      </div>
+    </div>
+    <!-- Slide 2: placeholder -->
+    <div class="carousel-slide">
+      <div class="carousel-placeholder">
+        <div class="ph-icon">🖼️</div>
+        <p>Segunda imagen de promoción aquí</p>
+      </div>
+    </div>
+    <!-- Slide 3: placeholder -->
+    <div class="carousel-slide">
+      <div class="carousel-placeholder">
+        <div class="ph-icon">🖼️</div>
+        <p>Tercera imagen de promoción aquí</p>
+      </div>
+    </div>
+  </div>
+  <button class="carousel-btn prev" onclick="moveCarousel(-1)">‹</button>
+  <button class="carousel-btn next" onclick="moveCarousel(1)">›</button>
+</div>
+<div class="carousel-dots" id="carouselDots"></div>
+
+<!-- BRAND BAR / SEARCH -->
+<div class="brand-bar">
+  <div class="brand-logo">
+    <div class="logo-mark">LM</div>
+    <div class="logo-text">
+      <h1>LETREROS MILI</h1>
+      <p>Letreros Plastificados</p>
+    </div>
+  </div>
+  <div class="search-wrap">
+    <span class="search-icon">🔍</span>
+    <input class="search-input" type="text" id="searchInput" placeholder="Buscar letrero… ej: amarillo, 40x60, prohibido…" oninput="handleSearch()">
+  </div>
+  <div class="search-results-badge" id="resultsBadge"></div>
 </div>
 
-<!-- TOPBAR (sin cambios) -->
-<div class="bg-white border-b border-slate-200 h-12 flex items-center px-3 gap-2 shrink-0 z-20 shadow-xs">
-    <!-- ... (mantener igual) ... -->
-    <div class="relative flex items-center border border-slate-300 rounded-md h-9 min-w-[180px] bg-white">
-        <label class="absolute text-[0.65rem] text-slate-500 top-0.5 left-2">Fecha</label>
-        <select class="w-full bg-transparent pt-4 pb-1 px-2 text-sm font-medium outline-none appearance-none cursor-pointer">
-            <option>17-03-2026</option>
-            <option>18-03-2026</option>
-        </select>
-        <div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"><i class="fas fa-chevron-down text-xs"></i></div>
+<!-- MAIN CATALOG -->
+<main>
+  <div class="section-header">
+    <div>
+      <div class="section-title">CATÁLOGO</div>
+      <div class="section-subtitle" id="pageLabel">Mostrando 1–10 de 30 letreros</div>
     </div>
-    <div class="w-px h-6 bg-slate-200"></div>
-    <div class="relative flex items-center border border-slate-300 rounded-md h-9 min-w-[160px] bg-white">
-        <label class="absolute text-[0.65rem] text-slate-500 top-0.5 left-2">Estado</label>
-        <select class="w-full bg-transparent pt-4 pb-1 px-2 text-sm font-medium outline-none appearance-none">
-            <option>Todos los estados</option>
-            <option>En ruta</option>
-            <option>Finalizado</option>
-            <option>Pendiente</option>
-        </select>
-        <div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"><i class="fas fa-chevron-down text-xs"></i></div>
-    </div>
-    <button class="ml-auto flex items-center gap-2 border border-slate-300 rounded-md h-9 px-4 text-sm font-medium bg-white hover:bg-slate-50 transition-colors shadow-sm">
-        <i class="fas fa-filter text-sm"></i>
-        <span>Filtros</span>
-    </button>
-</div>
+  </div>
+  <div class="grid" id="catalog"></div>
+  <div class="pagination" id="pagination"></div>
+</main>
 
-<!-- STATS BAR (sin cambios) -->
-<div class="bg-gradient-to-r from-slate-800 to-slate-900 flex items-stretch h-[72px] shrink-0 text-white">
-    <div class="flex items-center justify-center flex-col px-8 border-r border-white/10 min-w-[180px]">
-        <div class="text-2xl font-bold">12,8%</div>
-        <div class="text-[0.65rem] uppercase tracking-wider text-white/50">Pendientes</div>
-    </div>
-    <div class="flex items-center flex-1 px-6 gap-1">
-        <div class="flex flex-col items-center px-6 border-r border-white/10">
-            <div class="text-base font-semibold">18</div>
-            <div class="text-[0.65rem] text-white/50">Total entregas</div>
-        </div>
-        <div class="flex flex-col items-center px-6 border-r border-white/10">
-            <div class="text-base font-semibold text-emerald-400">12</div>
-            <div class="text-[0.65rem] text-white/50">Completadas</div>
-        </div>
-        <div class="flex flex-col items-center px-6 border-r border-white/10">
-            <div class="text-base font-semibold text-amber-400">4</div>
-            <div class="text-[0.65rem] text-white/50">En ruta</div>
-        </div>
-        <div class="flex flex-col items-center px-6">
-            <div class="text-base font-semibold text-blue-400">2</div>
-            <div class="text-[0.65rem] text-white/50">Pendientes</div>
-        </div>
-    </div>
-</div>
+<!-- FOOTER -->
+<footer>
+  <p>© 2025 <span>Letreros Mili</span>. Todos los derechos reservados.</p>
+  <p>Lima, Perú — <span>933 238 447</span></p>
+</footer>
 
-<!-- CUERPO PRINCIPAL -->
-<div class="flex flex-1 overflow-hidden">
-    <!-- Icon nav izquierda -->
-    <div class="w-12 bg-slate-800 flex flex-col items-center py-3 gap-1 shrink-0 border-r border-white/5">
-        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white bg-white/10 cursor-pointer">
-            <i class="fas fa-map-marked-alt text-lg"></i>
-        </div>
-    </div>
+<!-- WA FLOAT -->
+<a href="https://wa.me/51933238447?text=Hola%2C%20quiero%20más%20información%20sobre%20sus%20letreros" target="_blank" class="wa-float" title="Escríbenos por WhatsApp">
+  <svg viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+  </svg>
+</a>
 
-    <!-- LISTA DE CONDUCTORES -->
-    <div class="w-[280px] bg-white border-r border-slate-200 flex flex-col overflow-hidden shrink-0">
-        <div class="p-3 text-sm font-semibold border-b border-slate-100 flex items-center justify-between">
-            <span>Conductores activos</span>
-            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">5 en ruta</span>
-        </div>
-        <div class="flex-1 overflow-y-auto scrollable-thin" id="driversList"></div>
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-close">
+      <button class="modal-close-btn" onclick="closeModal()">✕</button>
     </div>
-
-    <!-- PANEL DE DETALLE -->
-    <div class="w-[300px] bg-white border-r border-slate-200 hidden flex-col shrink-0 overflow-hidden" id="detailPanel"></div>
-
-    <!-- MAPA -->
-    <div class="flex-1 relative">
-        <div id="map" class="absolute inset-0 w-full h-full"></div>
+    <div class="modal-inner">
+      <div class="modal-img-zone" id="modalImgZone" onclick="toggleZoom(this)">
+        <img id="modalImg" src="" alt="" class="modal-img">
+        <div class="zoom-hint">🔍 Click para zoom</div>
+      </div>
+      <div class="modal-info">
+        <span class="modal-tag" id="modalTag">Letrero Plastificado</span>
+        <div class="modal-name" id="modalName"></div>
+        <div class="modal-price" id="modalPrice"></div>
+        <div class="modal-specs" id="modalSpecs"></div>
+        <div class="modal-desc" id="modalDesc"></div>
+        <a id="modalWaBtn" href="#" target="_blank" class="wa-btn">
+          <svg viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+          Pedir por WhatsApp
+        </a>
+      </div>
     </div>
+  </div>
 </div>
 
 <script>
-(function() {
-    // Datos de conductores (sin cambios)
-    const DRIVERS = [
-        {
-            id: "C5", code: "C5", color: "#e67e22", name: "MIGUEL PEÑALVA", plate: "D8J-550", phone: "908 642 508",
-            cdt: "CDT-992", status: "transit", pct: 66, startTime: "07:15", timeOnRoute: "4:32 hrs", distKm: "89.4 km", 
-            ordManaged: "2/3", avatarBg: "bg-orange-500",
-            origin: { lat: -12.0850, lng: -77.0300, name: "Almacén Lima Norte" },
-            deliveries: [
-                { id: "T015-10201", client: "Metro Independencia", time: "08:45", status: "done", lat: -12.0005, lng: -77.0500, address: "Av. Túpac Amaru 1250" },
-                { id: "T015-10202", client: "Plaza Vea Los Olivos", time: "09:30", status: "transit", lat: -12.0100, lng: -77.0800, address: "Av. Carlos Izaguirre 850" },
-                { id: "T015-10203", client: "Wong San Martín", time: "10:50", status: "pending", lat: -11.9950, lng: -77.1000, address: "Av. San Martín 2132" }
-            ]
-        },
-        {
-            id: "C6", code: "C6", color: "#2980b9", name: "DANET NUÑEZ", plate: "D4M-601", phone: "933 915 636",
-            cdt: "CDT-988", status: "transit", pct: 40, startTime: "08:00", timeOnRoute: "3:48 hrs", distKm: "64.2 km", 
-            ordManaged: "2/5", avatarBg: "bg-blue-600",
-            origin: { lat: -12.0550, lng: -77.0600, name: "Almacén Callao" },
-            deliveries: [
-                { id: "T015-11501", client: "Metro Breña", time: "09:10", status: "done", lat: -12.0580, lng: -77.0530, address: "Av. Breña 450" },
-                { id: "T015-11503", client: "Vivanda San Isidro", time: "10:45", status: "transit", lat: -12.0950, lng: -77.0430, address: "Av. Camino Real 234" },
-                { id: "T015-11504", client: "Real Plaza Salaverry", time: "12:00", status: "pending", lat: -12.0820, lng: -77.0220, address: "Calle Salaverry 680" }
-            ]
-        },
-        {
-            id: "A4", code: "A4", color: "#27ae60", name: "PATRICIA LOAIZA", plate: "ABC-789", phone: "987 654 321",
-            cdt: "CDT-101", status: "done", pct: 100, startTime: "06:30", timeOnRoute: "5:10 hrs", distKm: "112 km", 
-            ordManaged: "4/4", avatarBg: "bg-green-600",
-            origin: { lat: -12.1000, lng: -77.0100, name: "Almacén Sur" },
-            deliveries: [
-                { id: "T015-201", client: "Plaza Vea Barranco", time: "07:50", status: "done", lat: -12.1440, lng: -77.0200, address: "Av. Grau 310" },
-                { id: "T015-202", client: "Metro Chorrillos", time: "09:20", status: "done", lat: -12.1650, lng: -77.0150, address: "Av. Paseo de la República 5500" },
-                { id: "T015-203", client: "Wong San Borja", time: "11:00", status: "done", lat: -12.1020, lng: -76.9980, address: "Av. Javier Prado 1350" },
-                { id: "T015-204", client: "Tottus México", time: "12:30", status: "done", lat: -12.0750, lng: -77.0340, address: "Av. México 420" }
-            ]
-        },
-        {
-            id: "B7", code: "B7", color: "#8e44ad", name: "CARLOS RAMIREZ", plate: "XYZ-456", phone: "955 123 789",
-            cdt: "CDT-205", status: "transit", pct: 75, startTime: "08:45", timeOnRoute: "2:15 hrs", distKm: "41 km", 
-            ordManaged: "3/4", avatarBg: "bg-purple-600",
-            origin: { lat: -12.0400, lng: -77.0800, name: "Almacén Callao" },
-            deliveries: [
-                { id: "T015-301", client: "Metro Bellavista", time: "09:30", status: "done", lat: -12.0480, lng: -77.1070, address: "Av. Colonial 2010" },
-                { id: "T015-302", client: "Plaza Vea Faucett", time: "10:20", status: "done", lat: -12.0200, lng: -77.1150, address: "Av. Faucett 890" },
-                { id: "T015-303", client: "Wong La Perla", time: "11:30", status: "transit", lat: -12.0700, lng: -77.1120, address: "Av. La Paz 320" },
-                { id: "T015-304", client: "Tottus Carmen", time: "12:45", status: "pending", lat: -12.0920, lng: -77.0880, address: "Av. Carmen 1155" }
-            ]
-        },
-        {
-            id: "D2", code: "D2", color: "#e67e22", name: "LUCIA MENDOZA", plate: "LMN-321", phone: "977 888 555",
-            cdt: "CDT-309", status: "transit", pct: 33, startTime: "09:00", timeOnRoute: "1:50 hrs", distKm: "28 km", 
-            ordManaged: "1/3", avatarBg: "bg-orange-500",
-            origin: { lat: -12.1200, lng: -77.0000, name: "Almacén Este" },
-            deliveries: [
-                { id: "T015-401", client: "Vivanda La Molina", time: "09:45", status: "done", lat: -12.0800, lng: -76.9500, address: "Av. La Molina 600" },
-                { id: "T015-402", client: "Metro Monterrico", time: "10:50", status: "transit", lat: -12.0970, lng: -76.9700, address: "Av. Monterrico 980" },
-                { id: "T015-403", client: "Plaza Vea Surco", time: "12:10", status: "pending", lat: -12.1400, lng: -76.9950, address: "Av. Velasco 1500" }
-            ]
-        }
-    ];
+// ── DATOS ──────────────────────────────────────────────────────────────────────
+const CDN = 'https://storage.webnova.pe/Saved%20Pictures/';
 
-    // Rutas predefinidas (ahora como FeatureCollection única)
-    const ROUTES_GEOJSON = {
-        type: 'FeatureCollection',
-        features: [
-            {
-                id: 'C5',
-                type: 'Feature',
-                geometry: {
-                    type: 'LineString',
-                    coordinates: simplifyRoute([
-                        [-77.0300, -12.0850], [-77.0350, -12.0800], [-77.0400, -12.0750],
-                        [-77.0450, -12.0700], [-77.0500, -12.0650], [-77.0550, -12.0600],
-                        [-77.0600, -12.0550], [-77.0650, -12.0500], [-77.0700, -12.0450],
-                        [-77.0750, -12.0400], [-77.0800, -12.0350], [-77.0850, -12.0300],
-                        [-77.0900, -12.0250], [-77.0950, -12.0200], [-77.1000, -12.0150]
-                    ])
-                },
-                properties: { color: '#e67e22' }
-            },
-            {
-                id: 'C6',
-                type: 'Feature',
-                geometry: {
-                    type: 'LineString',
-                    coordinates: simplifyRoute([
-                        [-77.0600, -12.0550], [-77.0580, -12.0600], [-77.0560, -12.0650],
-                        [-77.0540, -12.0700], [-77.0520, -12.0750], [-77.0500, -12.0800],
-                        [-77.0480, -12.0850], [-77.0460, -12.0900], [-77.0440, -12.0950],
-                        [-77.0420, -12.1000], [-77.0400, -12.1050]
-                    ])
-                },
-                properties: { color: '#2980b9' }
-            },
-            {
-                id: 'A4',
-                type: 'Feature',
-                geometry: {
-                    type: 'LineString',
-                    coordinates: simplifyRoute([
-                        [-77.0100, -12.1000], [-77.0150, -12.1050], [-77.0200, -12.1100],
-                        [-77.0250, -12.1150], [-77.0300, -12.1200], [-77.0350, -12.1250],
-                        [-77.0400, -12.1300], [-77.0450, -12.1350], [-77.0500, -12.1400]
-                    ])
-                },
-                properties: { color: '#27ae60' }
-            },
-            {
-                id: 'B7',
-                type: 'Feature',
-                geometry: {
-                    type: 'LineString',
-                    coordinates: simplifyRoute([
-                        [-77.0800, -12.0400], [-77.0850, -12.0450], [-77.0900, -12.0500],
-                        [-77.0950, -12.0550], [-77.1000, -12.0600], [-77.1050, -12.0650],
-                        [-77.1100, -12.0700], [-77.1150, -12.0750]
-                    ])
-                },
-                properties: { color: '#8e44ad' }
-            },
-            {
-                id: 'D2',
-                type: 'Feature',
-                geometry: {
-                    type: 'LineString',
-                    coordinates: simplifyRoute([
-                        [-77.0000, -12.1200], [-76.9900, -12.1150], [-76.9800, -12.1100],
-                        [-76.9700, -12.1050], [-76.9600, -12.1000], [-76.9500, -12.0950]
-                    ])
-                },
-                properties: { color: '#e67e22' }
-            }
-        ]
-    };
+// Catálogo de 30 letreros (personaliza nombres, medidas, precios, colores)
+const letreros = [
+  { id: 1, nombre: 'LETRERO Z', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 2, nombre: 'PLAZA NORTE', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 3, nombre: 'MEGAPLAZA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 4, nombre: 'METRO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 5, nombre: 'PUENTE NUEVO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 6, nombre: 'PARADA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 7, nombre: 'CALLAO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 8, nombre: 'VILLA LOS REYES', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 9, nombre: 'FECHA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 10, nombre: 'TRAPICHE', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 11, nombre: 'VILLA ESTELA', color: 'Negro/Amarillo', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 12, nombre: 'PACHACUTEC', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 13, nombre: 'VENTANILLA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 14, nombre: 'SALAVERRY', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 15, nombre: 'BARRANCA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 16, nombre: 'TODO ABANCAY', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 17, nombre: 'HUACHO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 18, nombre: 'LIMA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 19, nombre: 'JAVIER PRADO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 20, nombre: 'ALFONSO UGARTE', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 21, nombre: 'ALIPIO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 22, nombre: 'BASE', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 23, nombre: 'FUNDICION', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 24, nombre: 'SANTA ANITA', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 25, nombre: 'ATOCONGO', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 26, nombre: 'HUARAL', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 27, nombre: 'ZAPALLAL', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 28, nombre: 'VILLA EL SALVADOR', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+  { id: 30, nombre: 'ANCON', color: 'Amarillo/Negro', medidas: '30x12 cm', precio: 'S/ 3.00', cantidad: 100, tags: ['carros', 'combis', 'buses'] },
+];
 
-    // Puntos (origen y entregas) como una sola fuente GeoJSON
-    const POINTS_GEOJSON = {
-        type: 'FeatureCollection',
-        features: []
-    };
+letreros.forEach(l => {
+  l.img = `${CDN}img_${l.id}.png`;
+});
 
-    // Construir puntos GeoJSON
-    DRIVERS.forEach(driver => {
-        // Punto de origen
-        POINTS_GEOJSON.features.push({
-            id: `${driver.id}_origin`,
-            type: 'Feature',
-            geometry: {
-                type: 'Point',
-                coordinates: [driver.origin.lng, driver.origin.lat]
-            },
-            properties: {
-                type: 'origin',
-                driverId: driver.id,
-                name: driver.origin.name,
-                color: driver.color
-            }
-        });
+// ── PAGINACIÓN ─────────────────────────────────────────────────────────────────
+const PER_PAGE = 10;
+let currentPage = 1;
+let filteredData = [...letreros];
 
-        // Puntos de entrega
-        driver.deliveries.forEach((delivery, idx) => {
-            POINTS_GEOJSON.features.push({
-                id: `${driver.id}_delivery_${idx}`,
-                type: 'Feature',
-                geometry: {
-                    type: 'Point',
-                    coordinates: [delivery.lng, delivery.lat]
-                },
-                properties: {
-                    type: 'delivery',
-                    driverId: driver.id,
-                    client: delivery.client,
-                    address: delivery.address,
-                    time: delivery.time,
-                    status: delivery.status,
-                    index: idx + 1
-                }
-            });
-        });
-    });
+function renderCatalog() {
+  const start = (currentPage - 1) * PER_PAGE;
+  const end = start + PER_PAGE;
+  const items = filteredData.slice(start, end);
+  const catalog = document.getElementById('catalog');
 
-    // Función para simplificar rutas (reduce puntos innecesarios)
-    function simplifyRoute(coordinates) {
-        if (!coordinates || coordinates.length < 3) return coordinates;
-        
-        try {
-            const line = turf.lineString(coordinates);
-            // Simplificar con tolerancia 0.0001 (aprox 10 metros)
-            const simplified = turf.simplify(line, {
-                tolerance: 0.0001,
-                highQuality: false
-            });
-            return simplified.geometry.coordinates;
-        } catch (e) {
-            console.warn('Error simplificando ruta:', e);
-            return coordinates;
-        }
-    }
+  if (items.length === 0) {
+    catalog.innerHTML = `<div class="empty-state" style="grid-column:1/-1">
+      <div class="es-icon">🔍</div>
+      <h3>Sin resultados</h3>
+      <p>Intenta con otro término de búsqueda</p>
+    </div>`;
+    document.getElementById('pagination').innerHTML = '';
+    document.getElementById('pageLabel').textContent = '0 letreros encontrados';
+    return;
+  }
 
-    // Cache de estilos de puntos por conductor
-    const pointsFilterCache = new Map();
+  catalog.innerHTML = items.map((l, i) => `
+    <div class="card" style="animation-delay:${i*0.05}s" onclick="openModal(${l.id})">
+      <div class="card-img-wrap">
+        <img src="${l.img}" alt="${l.nombre}" loading="lazy">
+        <div class="card-badge">Nro. ${l.id}</div>
+      </div>
+      <div class="card-body">
+        <div class="card-name">${l.nombre}</div>
+        <div class="card-meta">
+          <span class="meta-pill">📐 ${l.medidas}</span>
+          <span class="meta-pill">🎨 ${l.color}</span>
+        </div>
+        <div class="card-price">${l.precio}<span>/ unidad</span></div>
+        <button class="card-cta">Ver detalle →</button>
+      </div>
+    </div>
+  `).join('');
 
-    let map, activeDriver = null;
+  const total = filteredData.length;
+  document.getElementById('pageLabel').textContent =
+    `Mostrando ${start+1}–${Math.min(end, total)} de ${total} letreros`;
 
-    function initMap() {
-        const mapLoading = document.getElementById('mapLoading');
-        
-        map = new maplibregl.Map({
-            container: 'map',
-            style: 'http://155.117.42.137:9090/styles/peru-chevere/style.json',
-            center: [-77.03188, -12.05038],
-            zoom: 11,
-            maxZoom: 15,
-            minZoom: 8,
-            fadeDuration: 0, // Sin efectos de fade para mejor rendimiento
-            renderWorldCopies: false // Ahorrar memoria
-        });
+  renderPagination();
+}
 
-        map.addControl(new maplibregl.NavigationControl({ 
-            showCompass: false,
-            showZoom: true 
-        }), 'bottom-right');
+function renderPagination() {
+  const total = filteredData.length;
+  const pages = Math.ceil(total / PER_PAGE);
+  if (pages <= 1) { document.getElementById('pagination').innerHTML=''; return; }
 
-        map.on('load', () => {
-            mapLoading.classList.add('hidden');
-            
-            // 1. Cargar rutas como UNA SOLA FUENTE
-            map.addSource('routes', {
-                type: 'geojson',
-                data: ROUTES_GEOJSON
-            });
+  let html = `<button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>`;
+  for (let p=1; p<=pages; p++) {
+    html += `<button class="page-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===pages?'disabled':''}>›</button>`;
+  document.getElementById('pagination').innerHTML = html;
+}
 
-            // Capa de rutas (optimizada)
-            map.addLayer({
-                id: 'routes-layer',
-                type: 'line',
-                source: 'routes',
-                layout: {
-                    'line-join': 'round',
-                    'line-cap': 'round',
-                    'visibility': 'none' // Oculto por defecto
-                },
-                paint: {
-                    'line-color': ['get', 'color'],
-                    'line-width': 4,
-                    'line-opacity': 0.8
-                }
-            });
+function goPage(p) {
+  const pages = Math.ceil(filteredData.length / PER_PAGE);
+  if (p < 1 || p > pages) return;
+  currentPage = p;
+  renderCatalog();
+  document.querySelector('main').scrollIntoView({ behavior: 'smooth' });
+}
 
-            // 2. Cargar puntos como UNA SOLA FUENTE
-            map.addSource('points', {
-                type: 'geojson',
-                data: POINTS_GEOJSON,
-                cluster: false // No necesitamos cluster para ~30 puntos
-            });
+// ── BÚSQUEDA FUZZY ─────────────────────────────────────────────────────────────
+function normalize(str) {
+  return str.toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9\s]/g, '');
+}
 
-            // Capa para orígenes (iconos de almacén)
-            map.loadImage('https://cdn.jsdelivr.net/npm/@mapbox/maki@6/icons/warehouse-15.svg', (error, image) => {
-                if (error) {
-                    console.warn('Error cargando icono warehouse, usando círculo');
-                    // Fallback a círculo si no carga la imagen
-                    addOriginCircleLayer();
-                } else {
-                    map.addImage('warehouse-icon', image);
-                    
-                    map.addLayer({
-                        id: 'origins-layer',
-                        type: 'symbol',
-                        source: 'points',
-                        filter: ['==', 'type', 'origin'],
-                        layout: {
-                            'icon-image': 'warehouse-icon',
-                            'icon-size': 1.5,
-                            'icon-allow-overlap': true,
-                            'icon-ignore-placement': true
-                        },
-                        paint: {
-                            'icon-color': ['get', 'color']
-                        }
-                    });
-                }
-            });
+function fuzzyMatch(query, target) {
+  if (!query) return true;
+  const q = normalize(query);
+  const t = normalize(target);
+  if (t.includes(q)) return true;
+  // Levenshtein básico para términos cortos
+  const words = q.split(/\s+/);
+  return words.some(w => {
+    if (w.length < 3) return t.includes(w);
+    return t.split(/\s+/).some(tw => levenshtein(w, tw) <= Math.floor(w.length / 3));
+  });
+}
 
-            // Capa para entregas (círculos con color según estado)
-            map.addLayer({
-                id: 'deliveries-layer',
-                type: 'circle',
-                source: 'points',
-                filter: ['==', 'type', 'delivery'],
-                paint: {
-                    'circle-radius': 8,
-                    'circle-color': [
-                        'match',
-                        ['get', 'status'],
-                        'done', '#10b981',
-                        'transit', '#3b82f6',
-                        'pending', '#94a3b8',
-                        '#94a3b8'
-                    ],
-                    'circle-stroke-width': 2,
-                    'circle-stroke-color': '#ffffff'
-                }
-            });
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length:m+1}, (_,i)=>[i,...Array(n).fill(0)]);
+  for (let j=0;j<=n;j++) dp[0][j]=j;
+  for (let i=1;i<=m;i++) for (let j=1;j<=n;j++) {
+    dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  }
+  return dp[m][n];
+}
 
-            // Capa para números de entrega (labels)
-            map.addLayer({
-                id: 'deliveries-label-layer',
-                type: 'symbol',
-                source: 'points',
-                filter: ['==', 'type', 'delivery'],
-                layout: {
-                    'text-field': ['get', 'index'],
-                    'text-size': 10,
-                    'text-allow-overlap': true,
-                    'text-ignore-placement': true,
-                    'text-offset': [0, -1.5]
-                },
-                paint: {
-                    'text-color': '#ffffff',
-                    'text-halo-color': '#000000',
-                    'text-halo-width': 1
-                }
-            });
+function handleSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  filteredData = q ? letreros.filter(l => {
+    const corpus = [l.nombre, l.color, l.medidas, l.precio, ...l.tags].join(' ');
+    return fuzzyMatch(q, corpus);
+  }) : [...letreros];
 
-            // Popups al hacer click
-            map.on('click', 'deliveries-layer', (e) => {
-                const props = e.features[0].properties;
-                new maplibregl.Popup()
-                    .setLngLat(e.lngLat)
-                    .setHTML(`
-                        <div class="p-2 min-w-[200px]">
-                            <div class="font-bold text-sm">${props.client}</div>
-                            <div class="text-xs text-slate-600 mt-1">${props.address}</div>
-                            <div class="flex items-center justify-between mt-2 text-xs">
-                                <span class="text-slate-500"><i class="far fa-clock mr-1"></i>${props.time}</span>
-                            </div>
-                        </div>
-                    `)
-                    .addTo(map);
-            });
+  const badge = document.getElementById('resultsBadge');
+  badge.innerHTML = q ? `<span>${filteredData.length}</span> resultados` : '';
+  currentPage = 1;
+  renderCatalog();
+}
 
-            map.on('click', 'origins-layer', (e) => {
-                const props = e.features[0].properties;
-                new maplibregl.Popup()
-                    .setLngLat(e.lngLat)
-                    .setHTML(`<b>${props.name}</b>`)
-                    .addTo(map);
-            });
+// ── MODAL ──────────────────────────────────────────────────────────────────────
+function openModal(id) {
+  const l = letreros.find(x => x.id === id);
+  if (!l) return;
 
-            // Cambiar cursor al pasar sobre puntos
-            map.on('mouseenter', 'deliveries-layer', () => {
-                map.getCanvas().style.cursor = 'pointer';
-            });
-            map.on('mouseleave', 'deliveries-layer', () => {
-                map.getCanvas().style.cursor = '';
-            });
+  const imgZone = document.getElementById('modalImgZone');
+  imgZone.classList.remove('zoomed');
 
-            renderDriversList();
-            
-            // Mostrar primer conductor
-            if (DRIVERS.length > 0) {
-                selectDriver(DRIVERS[0]);
-            }
-        });
-    }
+  document.getElementById('modalImg').src = l.img;
+  document.getElementById('modalImg').alt = l.nombre;
+  document.getElementById('modalName').textContent = l.nombre;
+  document.getElementById('modalPrice').innerHTML = `${l.precio}<small>/ unidad</small>`;
+  document.getElementById('modalSpecs').innerHTML = `
+    <div class="spec-item"><div class="spec-label">Medidas</div><div class="spec-value">${l.medidas}</div></div>
+    <div class="spec-item"><div class="spec-label">Color</div><div class="spec-value">${l.color}</div></div>
+    <div class="spec-item"><div class="spec-label">Stock</div><div class="spec-value">${l.cantidad} unid.</div></div>
+    <div class="spec-item"><div class="spec-label">Nro. Letrero</div><div class="spec-value">#${l.id}</div></div>
+  `;
+  document.getElementById('modalDesc').textContent =
+    `Letrero de alta resistencia, ideal para uso interior y exterior. Material impermeable, resistente al sol y al desgaste. `;
+  document.getElementById('modalTag').textContent = 'Letrero Para Carro';
 
-    function addOriginCircleLayer() {
-        map.addLayer({
-            id: 'origins-layer',
-            type: 'circle',
-            source: 'points',
-            filter: ['==', 'type', 'origin'],
-            paint: {
-                'circle-radius': 10,
-                'circle-color': ['get', 'color'],
-                'circle-stroke-width': 3,
-                'circle-stroke-color': '#ffffff'
-            }
-        });
-    }
+  const msg = encodeURIComponent(
+    `¡Hola! Estoy interesado en el letrero:\n\n` +
+    `📋 *${l.nombre}*\n` +
+    `📐 Medidas: ${l.medidas}\n` +
+    `🎨 Color: ${l.color}\n` +
+    `💰 Precio: ${l.precio}\n` +
+    `🔢 Nro. Letrero: #${l.id}\n\n` +
+    `¿Tienen disponibilidad?`
+  );
+  document.getElementById('modalWaBtn').href = `https://wa.me/51933238447?text=${msg}`;
 
-    function showDriverRoute(driver) {
-        // Filtrar rutas por ID del conductor usando setFilter (MUY RÁPIDO)
-        map.setFilter('routes-layer', ['==', 'id', driver.id]);
-        
-        // Mostrar la capa de rutas
-        map.setLayoutProperty('routes-layer', 'visibility', 'visible');
-    }
+  document.getElementById('modalOverlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
 
-    function showDriverPoints(driver) {
-        // Filtrar puntos para mostrar solo los del conductor actual
-        map.setFilter('origins-layer', ['all', 
-            ['==', 'type', 'origin'],
-            ['==', 'driverId', driver.id]
-        ]);
-        
-        map.setFilter('deliveries-layer', ['all', 
-            ['==', 'type', 'delivery'],
-            ['==', 'driverId', driver.id]
-        ]);
-        
-        map.setFilter('deliveries-label-layer', ['all', 
-            ['==', 'type', 'delivery'],
-            ['==', 'driverId', driver.id]
-        ]);
-    }
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+  document.body.style.overflow = '';
+}
 
-    function zoomToDriver(driver) {
-        const bounds = new maplibregl.LngLatBounds();
-        bounds.extend([driver.origin.lng, driver.origin.lat]);
-        driver.deliveries.forEach(d => bounds.extend([d.lng, d.lat]));
-        
-        requestAnimationFrame(() => {
-            map.fitBounds(bounds, { 
-                padding: 80, 
-                duration: 600,
-                maxZoom: 14
-            });
-        });
-    }
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+}
 
-    function renderDriversList() {
-        const container = document.getElementById('driversList');
-        container.innerHTML = '';
-        
-        DRIVERS.forEach(d => {
-            const activeClass = activeDriver?.id === d.id ? 'bg-blue-50 border-l-4 border-blue-500' : 'border-l-4 border-transparent hover:bg-slate-50';
-            
-            const item = document.createElement('div');
-            item.className = `flex items-center gap-3 p-3 border-b border-slate-100 cursor-pointer transition ${activeClass}`;
-            item.innerHTML = `
-                <div class="w-10 h-10 rounded-full ${d.avatarBg} flex items-center justify-center text-white font-bold text-sm shadow-sm">${d.code}</div>
-                <div class="flex-1 min-w-0">
-                    <div class="font-semibold text-slate-800 text-sm truncate">${d.name}</div>
-                    <div class="flex items-center gap-2 text-xs text-slate-500">
-                        <span><i class="fas fa-truck mr-1"></i>${d.plate}</span>
-                        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
-                        <span>${d.cdt}</span>
-                    </div>
-                </div>
-                <div class="text-right">
-                    <div class="text-sm font-bold ${d.status === 'transit' ? 'text-blue-600' : d.status === 'done' ? 'text-emerald-600' : 'text-slate-500'}">${d.pct}%</div>
-                    <div class="text-[0.6rem] text-slate-400">${d.ordManaged}</div>
-                </div>
-            `;
-            
-            item.addEventListener('click', () => selectDriver(d));
-            container.appendChild(item);
-        });
-    }
+function toggleZoom(zone) {
+  zone.classList.toggle('zoomed');
+}
 
-    function renderDetailPanel(driver) {
-        const panel = document.getElementById('detailPanel');
-        panel.classList.remove('hidden');
-        panel.classList.add('flex');
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-        const totalDels = driver.deliveries.length;
-        const doneCount = driver.deliveries.filter(d => d.status === 'done').length;
-        const transitCount = driver.deliveries.filter(d => d.status === 'transit').length;
+// ── CARRUSEL ───────────────────────────────────────────────────────────────────
+// 👉 PARA AGREGAR TUS IMÁGENES DE PROMO: cambia los objetos de 'promoSlides'
+// Ejemplo: { img: 'https://tu-url.com/promo1.jpg', titulo: '¡Oferta!', sub: 'Texto' }
+const promoSlides = [
+  { img: "https://storage.webnova.pe/Saved%20Pictures/baner_1.png", titulo: 'Letreros Comerciales y Personalizados', sub: 'Letreros para pegar en las parabrisas de los carros , buses, camiones , etc ' },
+  { img: "https://storage.webnova.pe/Saved%20Pictures/baner_2.png", titulo: '¡Promoción de Temporada!', sub: 'Por la subida de Gas LLevate estos letreros para colocarlos en las parabrisas' },
+  
+];
 
-        panel.innerHTML = `
-            <div class="p-4 text-white shrink-0" style="background:${driver.color}">
-                <button class="float-right w-6 h-6 rounded-full bg-black/20 text-white hover:bg-black/30 flex items-center justify-center" id="closeDetailBtn">
-                    <i class="fas fa-times text-xs"></i>
-                </button>
-                <div class="font-bold text-lg pr-6">${driver.name}</div>
-                <div class="flex items-center gap-2 text-sm text-white/80 mt-1">
-                    <span><i class="fas fa-id-card mr-1"></i>${driver.cdt}</span> · 
-                    <span><i class="fas fa-truck mr-1"></i>${driver.plate}</span>
-                </div>
-                <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
-                    <div class="bg-white/10 p-2 rounded">
-                        <div class="text-lg font-bold">${driver.ordManaged}</div>
-                        <div class="text-white/60"><i class="fas fa-box mr-1"></i>Órdenes</div>
-                    </div>
-                    <div class="bg-white/10 p-2 rounded">
-                        <div class="text-lg font-bold">${driver.distKm}</div>
-                        <div class="text-white/60"><i class="fas fa-road mr-1"></i>Distancia</div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="p-3 border-b border-slate-100">
-                <div class="flex justify-between text-sm mb-2">
-                    <span class="font-semibold"><i class="fas fa-chart-line mr-1"></i>Progreso de entregas</span>
-                    <span class="text-emerald-600 font-bold">${doneCount}/${totalDels}</span>
-                </div>
-                <div class="w-full bg-slate-200 rounded-full h-2.5">
-                    <div class="bg-emerald-500 h-2.5 rounded-full" style="width: ${(doneCount/totalDels)*100}%"></div>
-                </div>
-                <div class="flex justify-between mt-2 text-xs text-slate-500">
-                    <span><i class="fas fa-check-circle text-emerald-500 mr-1"></i>${doneCount}</span>
-                    <span><i class="fas fa-truck text-blue-500 mr-1"></i>${transitCount}</span>
-                    <span><i class="fas fa-clock text-slate-400 mr-1"></i>${totalDels - doneCount - transitCount}</span>
-                </div>
-            </div>
-            
-            <div class="flex-1 overflow-y-auto p-2" id="deliveriesList">
-                ${driver.deliveries.map((d, i) => `
-                    <div class="delivery-item flex gap-3 p-3 border-b border-slate-100 hover:bg-slate-50 rounded cursor-pointer" data-index="${i}">
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${d.status === 'done' ? 'bg-emerald-100 text-emerald-700' : d.status === 'transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">
-                            ${i+1}
-                        </div>
-                        <div class="flex-1">
-                            <div class="font-medium text-sm">${d.client}</div>
-                            <div class="text-xs text-slate-500 mt-0.5">${d.address}</div>
-                            <div class="flex items-center gap-2 mt-1 text-xs">
-                                <span class="text-slate-400"><i class="far fa-clock mr-1"></i>${d.time}</span>
-                                <span class="status-badge ${d.status === 'done' ? 'status-done' : d.status === 'transit' ? 'status-transit' : 'status-pending'}">
-                                    <i class="fas ${d.status === 'done' ? 'fa-check-circle' : d.status === 'transit' ? 'fa-truck' : 'fa-clock'}"></i>
-                                    ${d.status === 'done' ? 'Completado' : d.status === 'transit' ? 'En ruta' : 'Pendiente'}
-                                </span>
-                            </div>
-                        </div>
-                    </div>
-                `).join('')}
-            </div>
-            
-            <div class="p-3 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
-                <span><i class="far fa-clock mr-1"></i>Inicio: ${driver.startTime}</span>
-                <span><i class="fas fa-phone mr-1"></i>${driver.phone}</span>
-            </div>
-        `;
+let carouselIndex = 0;
+const track = document.getElementById('carouselTrack');
+const dotsContainer = document.getElementById('carouselDots');
 
-        document.getElementById('closeDetailBtn')?.addEventListener('click', closeDetail);
-        
-        // Los clicks en entregas ahora usan las capas del mapa
-        document.querySelectorAll('.delivery-item').forEach(el => {
-            el.addEventListener('click', (e) => {
-                const index = e.currentTarget.dataset.index;
-                if (index !== undefined) {
-                    const delivery = driver.deliveries[index];
-                    // Simular click en el mapa
-                    map.fire('click', {
-                        lngLat: [delivery.lng, delivery.lat],
-                        point: map.project([delivery.lng, delivery.lat])
-                    });
-                }
-            });
-        });
-    }
+function buildCarousel() {
+  // Rebuild slides from promoSlides data
+  track.innerHTML = promoSlides.map(s => `
+    <div class="carousel-slide">
+      ${s.img
+        ? `<img src="${s.img}" alt="${s.titulo}" loading="lazy"><div class="carousel-overlay"><div class="promo-badge">PROMO</div><h2>${s.titulo}</h2><p>${s.sub}</p></div>`
+        : `<div class="carousel-placeholder"><div class="ph-icon">🖼️</div><p>${s.sub}</p></div>`
+      }
+    </div>
+  `).join('');
 
-    function selectDriver(driver) {
-        const driverLoading = document.getElementById('driverLoading');
-        driverLoading.classList.add('active');
-        
-        activeDriver = driver;
-        renderDriversList();
-        
-        requestAnimationFrame(() => {
-            // Actualizar filtros (MUY RÁPIDO - no recarga nada)
-            showDriverRoute(driver);
-            showDriverPoints(driver);
-            
-            // Hacer zoom
-            zoomToDriver(driver);
-            
-            // Actualizar panel
-            renderDetailPanel(driver);
-            
-            setTimeout(() => {
-                driverLoading.classList.remove('active');
-            }, 400);
-        });
-    }
+  dotsContainer.innerHTML = promoSlides.map((_, i) =>
+    `<div class="dot ${i===0?'active':''}" onclick="goCarousel(${i})"></div>`
+  ).join('');
+}
 
-    function closeDetail() {
-        document.getElementById('detailPanel').classList.add('hidden');
-        activeDriver = null;
-        renderDriversList();
-        
-        // Ocultar rutas
-        map.setLayoutProperty('routes-layer', 'visibility', 'none');
-        
-        // Limpiar filtros de puntos
-        map.setFilter('origins-layer', null);
-        map.setFilter('deliveries-layer', null);
-        map.setFilter('deliveries-label-layer', null);
-        
-        // Volver a vista general
-        map.flyTo({
-            center: [-77.03188, -12.05038],
-            zoom: 11,
-            duration: 600
-        });
-    }
+function moveCarousel(dir) {
+  carouselIndex = (carouselIndex + dir + promoSlides.length) % promoSlides.length;
+  updateCarousel();
+}
 
-    window.addEventListener('DOMContentLoaded', initMap);
-})();
+function goCarousel(i) {
+  carouselIndex = i;
+  updateCarousel();
+}
+
+function updateCarousel() {
+  track.style.transform = `translateX(-${carouselIndex * 100}%)`;
+  document.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('active', i===carouselIndex));
+}
+
+// Auto-play
+setInterval(() => moveCarousel(1), 5000);
+
+// ── INIT ───────────────────────────────────────────────────────────────────────
+buildCarousel();
+renderCatalog();
 </script>
 </body>
+</html>
+    <script type="module" src="script.js"></script>
+  </body>
 </html>
