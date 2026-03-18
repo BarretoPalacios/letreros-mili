@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackFlow Pro · Optimizado</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- MapLibre GL JS & CSS -->
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+    <!-- Turf.js para simplificar geometrías -->
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body { font-family: 'Inter', system-ui, sans-serif; }
+        .scrollable-thin { scrollbar-width: thin; }
+        
+        /* Loading overlay optimizado */
+        .driver-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(4px);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            transition: opacity 0.2s ease;
+            pointer-events: none;
+        }
+        .driver-loading-overlay.active {
+            display: flex;
+        }
+        .driver-loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Loading inicial */
+        .map-loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            transition: opacity 0.3s;
+            pointer-events: none;
+        }
+        .map-loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* Estados de entrega */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .status-done {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-transit {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .status-pending {
+            background: #f1f5f9;
+            color: #334155;
+        }
+    </style>
+</head>
+<body class="h-screen flex flex-col bg-slate-100 text-slate-800 text-xs md:text-sm overflow-hidden">
+
+<!-- Loading overlay inicial -->
+<div class="map-loading-overlay" id="mapLoading">
+    <div class="driver-loading-spinner" style="border-top-color: white;"></div>
+    <div class="text-white font-medium">Cargando mapa...</div>
+</div>
+
+<!-- Loading para cambios de conductor -->
+<div class="driver-loading-overlay" id="driverLoading">
+    <div class="driver-loading-spinner"></div>
+    <div class="font-medium">Actualizando información...</div>
+</div>
+
+<!-- TOPBAR (sin cambios) -->
+<div class="bg-white border-b border-slate-200 h-12 flex items-center px-3 gap-2 shrink-0 z-20 shadow-xs">
+    <!-- ... (mantener igual) ... -->
+    <div class="relative flex items-center border border-slate-300 rounded-md h-9 min-w-[180px] bg-white">
+        <label class="absolute text-[0.65rem] text-slate-500 top-0.5 left-2">Fecha</label>
+        <select class="w-full bg-transparent pt-4 pb-1 px-2 text-sm font-medium outline-none appearance-none cursor-pointer">
+            <option>17-03-2026</option>
+            <option>18-03-2026</option>
+        </select>
+        <div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"><i class="fas fa-chevron-down text-xs"></i></div>
+    </div>
+    <div class="w-px h-6 bg-slate-200"></div>
+    <div class="relative flex items-center border border-slate-300 rounded-md h-9 min-w-[160px] bg-white">
+        <label class="absolute text-[0.65rem] text-slate-500 top-0.5 left-2">Estado</label>
+        <select class="w-full bg-transparent pt-4 pb-1 px-2 text-sm font-medium outline-none appearance-none">
+            <option>Todos los estados</option>
+            <option>En ruta</option>
+            <option>Finalizado</option>
+            <option>Pendiente</option>
+        </select>
+        <div class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-slate-400"><i class="fas fa-chevron-down text-xs"></i></div>
+    </div>
+    <button class="ml-auto flex items-center gap-2 border border-slate-300 rounded-md h-9 px-4 text-sm font-medium bg-white hover:bg-slate-50 transition-colors shadow-sm">
+        <i class="fas fa-filter text-sm"></i>
+        <span>Filtros</span>
+    </button>
+</div>
+
+<!-- STATS BAR (sin cambios) -->
+<div class="bg-gradient-to-r from-slate-800 to-slate-900 flex items-stretch h-[72px] shrink-0 text-white">
+    <div class="flex items-center justify-center flex-col px-8 border-r border-white/10 min-w-[180px]">
+        <div class="text-2xl font-bold">12,8%</div>
+        <div class="text-[0.65rem] uppercase tracking-wider text-white/50">Pendientes</div>
+    </div>
+    <div class="flex items-center flex-1 px-6 gap-1">
+        <div class="flex flex-col items-center px-6 border-r border-white/10">
+            <div class="text-base font-semibold">18</div>
+            <div class="text-[0.65rem] text-white/50">Total entregas</div>
+        </div>
+        <div class="flex flex-col items-center px-6 border-r border-white/10">
+            <div class="text-base font-semibold text-emerald-400">12</div>
+            <div class="text-[0.65rem] text-white/50">Completadas</div>
+        </div>
+        <div class="flex flex-col items-center px-6 border-r border-white/10">
+            <div class="text-base font-semibold text-amber-400">4</div>
+            <div class="text-[0.65rem] text-white/50">En ruta</div>
+        </div>
+        <div class="flex flex-col items-center px-6">
+            <div class="text-base font-semibold text-blue-400">2</div>
+            <div class="text-[0.65rem] text-white/50">Pendientes</div>
+        </div>
+    </div>
+</div>
+
+<!-- CUERPO PRINCIPAL -->
+<div class="flex flex-1 overflow-hidden">
+    <!-- Icon nav izquierda -->
+    <div class="w-12 bg-slate-800 flex flex-col items-center py-3 gap-1 shrink-0 border-r border-white/5">
+        <div class="w-9 h-9 rounded-lg flex items-center justify-center text-white bg-white/10 cursor-pointer">
+            <i class="fas fa-map-marked-alt text-lg"></i>
+        </div>
+    </div>
+
+    <!-- LISTA DE CONDUCTORES -->
+    <div class="w-[280px] bg-white border-r border-slate-200 flex flex-col overflow-hidden shrink-0">
+        <div class="p-3 text-sm font-semibold border-b border-slate-100 flex items-center justify-between">
+            <span>Conductores activos</span>
+            <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">5 en ruta</span>
+        </div>
+        <div class="flex-1 overflow-y-auto scrollable-thin" id="driversList"></div>
+    </div>
+
+    <!-- PANEL DE DETALLE -->
+    <div class="w-[300px] bg-white border-r border-slate-200 hidden flex-col shrink-0 overflow-hidden" id="detailPanel"></div>
+
+    <!-- MAPA -->
+    <div class="flex-1 relative">
+        <div id="map" class="absolute inset-0 w-full h-full"></div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // Datos de conductores (sin cambios)
+    const DRIVERS = [
+        {
+            id: "C5", code: "C5", color: "#e67e22", name: "MIGUEL PEÑALVA", plate: "D8J-550", phone: "908 642 508",
+            cdt: "CDT-992", status: "transit", pct: 66, startTime: "07:15", timeOnRoute: "4:32 hrs", distKm: "89.4 km", 
+            ordManaged: "2/3", avatarBg: "bg-orange-500",
+            origin: { lat: -12.0850, lng: -77.0300, name: "Almacén Lima Norte" },
+            deliveries: [
+                { id: "T015-10201", client: "Metro Independencia", time: "08:45", status: "done", lat: -12.0005, lng: -77.0500, address: "Av. Túpac Amaru 1250" },
+                { id: "T015-10202", client: "Plaza Vea Los Olivos", time: "09:30", status: "transit", lat: -12.0100, lng: -77.0800, address: "Av. Carlos Izaguirre 850" },
+                { id: "T015-10203", client: "Wong San Martín", time: "10:50", status: "pending", lat: -11.9950, lng: -77.1000, address: "Av. San Martín 2132" }
+            ]
+        },
+        {
+            id: "C6", code: "C6", color: "#2980b9", name: "DANET NUÑEZ", plate: "D4M-601", phone: "933 915 636",
+            cdt: "CDT-988", status: "transit", pct: 40, startTime: "08:00", timeOnRoute: "3:48 hrs", distKm: "64.2 km", 
+            ordManaged: "2/5", avatarBg: "bg-blue-600",
+            origin: { lat: -12.0550, lng: -77.0600, name: "Almacén Callao" },
+            deliveries: [
+                { id: "T015-11501", client: "Metro Breña", time: "09:10", status: "done", lat: -12.0580, lng: -77.0530, address: "Av. Breña 450" },
+                { id: "T015-11503", client: "Vivanda San Isidro", time: "10:45", status: "transit", lat: -12.0950, lng: -77.0430, address: "Av. Camino Real 234" },
+                { id: "T015-11504", client: "Real Plaza Salaverry", time: "12:00", status: "pending", lat: -12.0820, lng: -77.0220, address: "Calle Salaverry 680" }
+            ]
+        },
+        {
+            id: "A4", code: "A4", color: "#27ae60", name: "PATRICIA LOAIZA", plate: "ABC-789", phone: "987 654 321",
+            cdt: "CDT-101", status: "done", pct: 100, startTime: "06:30", timeOnRoute: "5:10 hrs", distKm: "112 km", 
+            ordManaged: "4/4", avatarBg: "bg-green-600",
+            origin: { lat: -12.1000, lng: -77.0100, name: "Almacén Sur" },
+            deliveries: [
+                { id: "T015-201", client: "Plaza Vea Barranco", time: "07:50", status: "done", lat: -12.1440, lng: -77.0200, address: "Av. Grau 310" },
+                { id: "T015-202", client: "Metro Chorrillos", time: "09:20", status: "done", lat: -12.1650, lng: -77.0150, address: "Av. Paseo de la República 5500" },
+                { id: "T015-203", client: "Wong San Borja", time: "11:00", status: "done", lat: -12.1020, lng: -76.9980, address: "Av. Javier Prado 1350" },
+                { id: "T015-204", client: "Tottus México", time: "12:30", status: "done", lat: -12.0750, lng: -77.0340, address: "Av. México 420" }
+            ]
+        },
+        {
+            id: "B7", code: "B7", color: "#8e44ad", name: "CARLOS RAMIREZ", plate: "XYZ-456", phone: "955 123 789",
+            cdt: "CDT-205", status: "transit", pct: 75, startTime: "08:45", timeOnRoute: "2:15 hrs", distKm: "41 km", 
+            ordManaged: "3/4", avatarBg: "bg-purple-600",
+            origin: { lat: -12.0400, lng: -77.0800, name: "Almacén Callao" },
+            deliveries: [
+                { id: "T015-301", client: "Metro Bellavista", time: "09:30", status: "done", lat: -12.0480, lng: -77.1070, address: "Av. Colonial 2010" },
+                { id: "T015-302", client: "Plaza Vea Faucett", time: "10:20", status: "done", lat: -12.0200, lng: -77.1150, address: "Av. Faucett 890" },
+                { id: "T015-303", client: "Wong La Perla", time: "11:30", status: "transit", lat: -12.0700, lng: -77.1120, address: "Av. La Paz 320" },
+                { id: "T015-304", client: "Tottus Carmen", time: "12:45", status: "pending", lat: -12.0920, lng: -77.0880, address: "Av. Carmen 1155" }
+            ]
+        },
+        {
+            id: "D2", code: "D2", color: "#e67e22", name: "LUCIA MENDOZA", plate: "LMN-321", phone: "977 888 555",
+            cdt: "CDT-309", status: "transit", pct: 33, startTime: "09:00", timeOnRoute: "1:50 hrs", distKm: "28 km", 
+            ordManaged: "1/3", avatarBg: "bg-orange-500",
+            origin: { lat: -12.1200, lng: -77.0000, name: "Almacén Este" },
+            deliveries: [
+                { id: "T015-401", client: "Vivanda La Molina", time: "09:45", status: "done", lat: -12.0800, lng: -76.9500, address: "Av. La Molina 600" },
+                { id: "T015-402", client: "Metro Monterrico", time: "10:50", status: "transit", lat: -12.0970, lng: -76.9700, address: "Av. Monterrico 980" },
+                { id: "T015-403", client: "Plaza Vea Surco", time: "12:10", status: "pending", lat: -12.1400, lng: -76.9950, address: "Av. Velasco 1500" }
+            ]
+        }
+    ];
+
+    // Rutas predefinidas (ahora como FeatureCollection única)
+    const ROUTES_GEOJSON = {
+        type: 'FeatureCollection',
+        features: [
+            {
+                id: 'C5',
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: simplifyRoute([
+                        [-77.0300, -12.0850], [-77.0350, -12.0800], [-77.0400, -12.0750],
+                        [-77.0450, -12.0700], [-77.0500, -12.0650], [-77.0550, -12.0600],
+                        [-77.0600, -12.0550], [-77.0650, -12.0500], [-77.0700, -12.0450],
+                        [-77.0750, -12.0400], [-77.0800, -12.0350], [-77.0850, -12.0300],
+                        [-77.0900, -12.0250], [-77.0950, -12.0200], [-77.1000, -12.0150]
+                    ])
+                },
+                properties: { color: '#e67e22' }
+            },
+            {
+                id: 'C6',
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: simplifyRoute([
+                        [-77.0600, -12.0550], [-77.0580, -12.0600], [-77.0560, -12.0650],
+                        [-77.0540, -12.0700], [-77.0520, -12.0750], [-77.0500, -12.0800],
+                        [-77.0480, -12.0850], [-77.0460, -12.0900], [-77.0440, -12.0950],
+                        [-77.0420, -12.1000], [-77.0400, -12.1050]
+                    ])
+                },
+                properties: { color: '#2980b9' }
+            },
+            {
+                id: 'A4',
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: simplifyRoute([
+                        [-77.0100, -12.1000], [-77.0150, -12.1050], [-77.0200, -12.1100],
+                        [-77.0250, -12.1150], [-77.0300, -12.1200], [-77.0350, -12.1250],
+                        [-77.0400, -12.1300], [-77.0450, -12.1350], [-77.0500, -12.1400]
+                    ])
+                },
+                properties: { color: '#27ae60' }
+            },
+            {
+                id: 'B7',
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: simplifyRoute([
+                        [-77.0800, -12.0400], [-77.0850, -12.0450], [-77.0900, -12.0500],
+                        [-77.0950, -12.0550], [-77.1000, -12.0600], [-77.1050, -12.0650],
+                        [-77.1100, -12.0700], [-77.1150, -12.0750]
+                    ])
+                },
+                properties: { color: '#8e44ad' }
+            },
+            {
+                id: 'D2',
+                type: 'Feature',
+                geometry: {
+                    type: 'LineString',
+                    coordinates: simplifyRoute([
+                        [-77.0000, -12.1200], [-76.9900, -12.1150], [-76.9800, -12.1100],
+                        [-76.9700, -12.1050], [-76.9600, -12.1000], [-76.9500, -12.0950]
+                    ])
+                },
+                properties: { color: '#e67e22' }
+            }
+        ]
+    };
+
+    // Puntos (origen y entregas) como una sola fuente GeoJSON
+    const POINTS_GEOJSON = {
+        type: 'FeatureCollection',
+        features: []
+    };
+
+    // Construir puntos GeoJSON
+    DRIVERS.forEach(driver => {
+        // Punto de origen
+        POINTS_GEOJSON.features.push({
+            id: `${driver.id}_origin`,
+            type: 'Feature',
+            geometry: {
+                type: 'Point',
+                coordinates: [driver.origin.lng, driver.origin.lat]
+            },
+            properties: {
+                type: 'origin',
+                driverId: driver.id,
+                name: driver.origin.name,
+                color: driver.color
+            }
+        });
+
+        // Puntos de entrega
+        driver.deliveries.forEach((delivery, idx) => {
+            POINTS_GEOJSON.features.push({
+                id: `${driver.id}_delivery_${idx}`,
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [delivery.lng, delivery.lat]
+                },
+                properties: {
+                    type: 'delivery',
+                    driverId: driver.id,
+                    client: delivery.client,
+                    address: delivery.address,
+                    time: delivery.time,
+                    status: delivery.status,
+                    index: idx + 1
+                }
+            });
+        });
+    });
+
+    // Función para simplificar rutas (reduce puntos innecesarios)
+    function simplifyRoute(coordinates) {
+        if (!coordinates || coordinates.length < 3) return coordinates;
+        
+        try {
+            const line = turf.lineString(coordinates);
+            // Simplificar con tolerancia 0.0001 (aprox 10 metros)
+            const simplified = turf.simplify(line, {
+                tolerance: 0.0001,
+                highQuality: false
+            });
+            return simplified.geometry.coordinates;
+        } catch (e) {
+            console.warn('Error simplificando ruta:', e);
+            return coordinates;
+        }
+    }
+
+    // Cache de estilos de puntos por conductor
+    const pointsFilterCache = new Map();
+
+    let map, activeDriver = null;
+
+    function initMap() {
+        const mapLoading = document.getElementById('mapLoading');
+        
+        map = new maplibregl.Map({
+            container: 'map',
+            style: 'http://155.117.42.137:9090/styles/peru-chevere/style.json',
+            center: [-77.03188, -12.05038],
+            zoom: 11,
+            maxZoom: 15,
+            minZoom: 8,
+            fadeDuration: 0, // Sin efectos de fade para mejor rendimiento
+            renderWorldCopies: false // Ahorrar memoria
+        });
+
+        map.addControl(new maplibregl.NavigationControl({ 
+            showCompass: false,
+            showZoom: true 
+        }), 'bottom-right');
+
+        map.on('load', () => {
+            mapLoading.classList.add('hidden');
+            
+            // 1. Cargar rutas como UNA SOLA FUENTE
+            map.addSource('routes', {
+                type: 'geojson',
+                data: ROUTES_GEOJSON
+            });
+
+            // Capa de rutas (optimizada)
+            map.addLayer({
+                id: 'routes-layer',
+                type: 'line',
+                source: 'routes',
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round',
+                    'visibility': 'none' // Oculto por defecto
+                },
+                paint: {
+                    'line-color': ['get', 'color'],
+                    'line-width': 4,
+                    'line-opacity': 0.8
+                }
+            });
+
+            // 2. Cargar puntos como UNA SOLA FUENTE
+            map.addSource('points', {
+                type: 'geojson',
+                data: POINTS_GEOJSON,
+                cluster: false // No necesitamos cluster para ~30 puntos
+            });
+
+            // Capa para orígenes (iconos de almacén)
+            map.loadImage('https://cdn.jsdelivr.net/npm/@mapbox/maki@6/icons/warehouse-15.svg', (error, image) => {
+                if (error) {
+                    console.warn('Error cargando icono warehouse, usando círculo');
+                    // Fallback a círculo si no carga la imagen
+                    addOriginCircleLayer();
+                } else {
+                    map.addImage('warehouse-icon', image);
+                    
+                    map.addLayer({
+                        id: 'origins-layer',
+                        type: 'symbol',
+                        source: 'points',
+                        filter: ['==', 'type', 'origin'],
+                        layout: {
+                            'icon-image': 'warehouse-icon',
+                            'icon-size': 1.5,
+                            'icon-allow-overlap': true,
+                            'icon-ignore-placement': true
+                        },
+                        paint: {
+                            'icon-color': ['get', 'color']
+                        }
+                    });
+                }
+            });
+
+            // Capa para entregas (círculos con color según estado)
+            map.addLayer({
+                id: 'deliveries-layer',
+                type: 'circle',
+                source: 'points',
+                filter: ['==', 'type', 'delivery'],
+                paint: {
+                    'circle-radius': 8,
+                    'circle-color': [
+                        'match',
+                        ['get', 'status'],
+                        'done', '#10b981',
+                        'transit', '#3b82f6',
+                        'pending', '#94a3b8',
+                        '#94a3b8'
+                    ],
+                    'circle-stroke-width': 2,
+                    'circle-stroke-color': '#ffffff'
+                }
+            });
+
+            // Capa para números de entrega (labels)
+            map.addLayer({
+                id: 'deliveries-label-layer',
+                type: 'symbol',
+                source: 'points',
+                filter: ['==', 'type', 'delivery'],
+                layout: {
+                    'text-field': ['get', 'index'],
+                    'text-size': 10,
+                    'text-allow-overlap': true,
+                    'text-ignore-placement': true,
+                    'text-offset': [0, -1.5]
+                },
+                paint: {
+                    'text-color': '#ffffff',
+                    'text-halo-color': '#000000',
+                    'text-halo-width': 1
+                }
+            });
+
+            // Popups al hacer click
+            map.on('click', 'deliveries-layer', (e) => {
+                const props = e.features[0].properties;
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(`
+                        <div class="p-2 min-w-[200px]">
+                            <div class="font-bold text-sm">${props.client}</div>
+                            <div class="text-xs text-slate-600 mt-1">${props.address}</div>
+                            <div class="flex items-center justify-between mt-2 text-xs">
+                                <span class="text-slate-500"><i class="far fa-clock mr-1"></i>${props.time}</span>
+                            </div>
+                        </div>
+                    `)
+                    .addTo(map);
+            });
+
+            map.on('click', 'origins-layer', (e) => {
+                const props = e.features[0].properties;
+                new maplibregl.Popup()
+                    .setLngLat(e.lngLat)
+                    .setHTML(`<b>${props.name}</b>`)
+                    .addTo(map);
+            });
+
+            // Cambiar cursor al pasar sobre puntos
+            map.on('mouseenter', 'deliveries-layer', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+            map.on('mouseleave', 'deliveries-layer', () => {
+                map.getCanvas().style.cursor = '';
+            });
+
+            renderDriversList();
+            
+            // Mostrar primer conductor
+            if (DRIVERS.length > 0) {
+                selectDriver(DRIVERS[0]);
+            }
+        });
+    }
+
+    function addOriginCircleLayer() {
+        map.addLayer({
+            id: 'origins-layer',
+            type: 'circle',
+            source: 'points',
+            filter: ['==', 'type', 'origin'],
+            paint: {
+                'circle-radius': 10,
+                'circle-color': ['get', 'color'],
+                'circle-stroke-width': 3,
+                'circle-stroke-color': '#ffffff'
+            }
+        });
+    }
+
+    function showDriverRoute(driver) {
+        // Filtrar rutas por ID del conductor usando setFilter (MUY RÁPIDO)
+        map.setFilter('routes-layer', ['==', 'id', driver.id]);
+        
+        // Mostrar la capa de rutas
+        map.setLayoutProperty('routes-layer', 'visibility', 'visible');
+    }
+
+    function showDriverPoints(driver) {
+        // Filtrar puntos para mostrar solo los del conductor actual
+        map.setFilter('origins-layer', ['all', 
+            ['==', 'type', 'origin'],
+            ['==', 'driverId', driver.id]
+        ]);
+        
+        map.setFilter('deliveries-layer', ['all', 
+            ['==', 'type', 'delivery'],
+            ['==', 'driverId', driver.id]
+        ]);
+        
+        map.setFilter('deliveries-label-layer', ['all', 
+            ['==', 'type', 'delivery'],
+            ['==', 'driverId', driver.id]
+        ]);
+    }
+
+    function zoomToDriver(driver) {
+        const bounds = new maplibregl.LngLatBounds();
+        bounds.extend([driver.origin.lng, driver.origin.lat]);
+        driver.deliveries.forEach(d => bounds.extend([d.lng, d.lat]));
+        
+        requestAnimationFrame(() => {
+            map.fitBounds(bounds, { 
+                padding: 80, 
+                duration: 600,
+                maxZoom: 14
+            });
+        });
+    }
+
+    function renderDriversList() {
+        const container = document.getElementById('driversList');
+        container.innerHTML = '';
+        
+        DRIVERS.forEach(d => {
+            const activeClass = activeDriver?.id === d.id ? 'bg-blue-50 border-l-4 border-blue-500' : 'border-l-4 border-transparent hover:bg-slate-50';
+            
+            const item = document.createElement('div');
+            item.className = `flex items-center gap-3 p-3 border-b border-slate-100 cursor-pointer transition ${activeClass}`;
+            item.innerHTML = `
+                <div class="w-10 h-10 rounded-full ${d.avatarBg} flex items-center justify-center text-white font-bold text-sm shadow-sm">${d.code}</div>
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-slate-800 text-sm truncate">${d.name}</div>
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                        <span><i class="fas fa-truck mr-1"></i>${d.plate}</span>
+                        <span class="w-1 h-1 rounded-full bg-slate-300"></span>
+                        <span>${d.cdt}</span>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div class="text-sm font-bold ${d.status === 'transit' ? 'text-blue-600' : d.status === 'done' ? 'text-emerald-600' : 'text-slate-500'}">${d.pct}%</div>
+                    <div class="text-[0.6rem] text-slate-400">${d.ordManaged}</div>
+                </div>
+            `;
+            
+            item.addEventListener('click', () => selectDriver(d));
+            container.appendChild(item);
+        });
+    }
+
+    function renderDetailPanel(driver) {
+        const panel = document.getElementById('detailPanel');
+        panel.classList.remove('hidden');
+        panel.classList.add('flex');
+
+        const totalDels = driver.deliveries.length;
+        const doneCount = driver.deliveries.filter(d => d.status === 'done').length;
+        const transitCount = driver.deliveries.filter(d => d.status === 'transit').length;
+
+        panel.innerHTML = `
+            <div class="p-4 text-white shrink-0" style="background:${driver.color}">
+                <button class="float-right w-6 h-6 rounded-full bg-black/20 text-white hover:bg-black/30 flex items-center justify-center" id="closeDetailBtn">
+                    <i class="fas fa-times text-xs"></i>
+                </button>
+                <div class="font-bold text-lg pr-6">${driver.name}</div>
+                <div class="flex items-center gap-2 text-sm text-white/80 mt-1">
+                    <span><i class="fas fa-id-card mr-1"></i>${driver.cdt}</span> · 
+                    <span><i class="fas fa-truck mr-1"></i>${driver.plate}</span>
+                </div>
+                <div class="grid grid-cols-2 gap-2 mt-3 text-xs">
+                    <div class="bg-white/10 p-2 rounded">
+                        <div class="text-lg font-bold">${driver.ordManaged}</div>
+                        <div class="text-white/60"><i class="fas fa-box mr-1"></i>Órdenes</div>
+                    </div>
+                    <div class="bg-white/10 p-2 rounded">
+                        <div class="text-lg font-bold">${driver.distKm}</div>
+                        <div class="text-white/60"><i class="fas fa-road mr-1"></i>Distancia</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-3 border-b border-slate-100">
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="font-semibold"><i class="fas fa-chart-line mr-1"></i>Progreso de entregas</span>
+                    <span class="text-emerald-600 font-bold">${doneCount}/${totalDels}</span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-2.5">
+                    <div class="bg-emerald-500 h-2.5 rounded-full" style="width: ${(doneCount/totalDels)*100}%"></div>
+                </div>
+                <div class="flex justify-between mt-2 text-xs text-slate-500">
+                    <span><i class="fas fa-check-circle text-emerald-500 mr-1"></i>${doneCount}</span>
+                    <span><i class="fas fa-truck text-blue-500 mr-1"></i>${transitCount}</span>
+                    <span><i class="fas fa-clock text-slate-400 mr-1"></i>${totalDels - doneCount - transitCount}</span>
+                </div>
+            </div>
+            
+            <div class="flex-1 overflow-y-auto p-2" id="deliveriesList">
+                ${driver.deliveries.map((d, i) => `
+                    <div class="delivery-item flex gap-3 p-3 border-b border-slate-100 hover:bg-slate-50 rounded cursor-pointer" data-index="${i}">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${d.status === 'done' ? 'bg-emerald-100 text-emerald-700' : d.status === 'transit' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}">
+                            ${i+1}
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-medium text-sm">${d.client}</div>
+                            <div class="text-xs text-slate-500 mt-0.5">${d.address}</div>
+                            <div class="flex items-center gap-2 mt-1 text-xs">
+                                <span class="text-slate-400"><i class="far fa-clock mr-1"></i>${d.time}</span>
+                                <span class="status-badge ${d.status === 'done' ? 'status-done' : d.status === 'transit' ? 'status-transit' : 'status-pending'}">
+                                    <i class="fas ${d.status === 'done' ? 'fa-check-circle' : d.status === 'transit' ? 'fa-truck' : 'fa-clock'}"></i>
+                                    ${d.status === 'done' ? 'Completado' : d.status === 'transit' ? 'En ruta' : 'Pendiente'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+            
+            <div class="p-3 border-t border-slate-100 text-xs text-slate-500 flex justify-between">
+                <span><i class="far fa-clock mr-1"></i>Inicio: ${driver.startTime}</span>
+                <span><i class="fas fa-phone mr-1"></i>${driver.phone}</span>
+            </div>
+        `;
+
+        document.getElementById('closeDetailBtn')?.addEventListener('click', closeDetail);
+        
+        // Los clicks en entregas ahora usan las capas del mapa
+        document.querySelectorAll('.delivery-item').forEach(el => {
+            el.addEventListener('click', (e) => {
+                const index = e.currentTarget.dataset.index;
+                if (index !== undefined) {
+                    const delivery = driver.deliveries[index];
+                    // Simular click en el mapa
+                    map.fire('click', {
+                        lngLat: [delivery.lng, delivery.lat],
+                        point: map.project([delivery.lng, delivery.lat])
+                    });
+                }
+            });
+        });
+    }
+
+    function selectDriver(driver) {
+        const driverLoading = document.getElementById('driverLoading');
+        driverLoading.classList.add('active');
+        
+        activeDriver = driver;
+        renderDriversList();
+        
+        requestAnimationFrame(() => {
+            // Actualizar filtros (MUY RÁPIDO - no recarga nada)
+            showDriverRoute(driver);
+            showDriverPoints(driver);
+            
+            // Hacer zoom
+            zoomToDriver(driver);
+            
+            // Actualizar panel
+            renderDetailPanel(driver);
+            
+            setTimeout(() => {
+                driverLoading.classList.remove('active');
+            }, 400);
+        });
+    }
+
+    function closeDetail() {
+        document.getElementById('detailPanel').classList.add('hidden');
+        activeDriver = null;
+        renderDriversList();
+        
+        // Ocultar rutas
+        map.setLayoutProperty('routes-layer', 'visibility', 'none');
+        
+        // Limpiar filtros de puntos
+        map.setFilter('origins-layer', null);
+        map.setFilter('deliveries-layer', null);
+        map.setFilter('deliveries-label-layer', null);
+        
+        // Volver a vista general
+        map.flyTo({
+            center: [-77.03188, -12.05038],
+            zoom: 11,
+            duration: 600
+        });
+    }
+
+    window.addEventListener('DOMContentLoaded', initMap);
+})();
+</script>
+</body>
+</html>
